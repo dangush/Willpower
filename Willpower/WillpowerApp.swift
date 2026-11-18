@@ -11,8 +11,8 @@ import AppKit
 
 @main
 struct WillpowerApp: App {
-    @State private var viewModel = WillpowerViewModel()
-    @State private var daemonManager = DaemonManager()
+    private var viewModel: WillpowerViewModel { appDelegate.viewModel }
+    private var daemonManager: DaemonManager { appDelegate.daemonManager }
     @State private var updaterController = UpdaterController()
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var showOnboarding = false
@@ -28,9 +28,6 @@ struct WillpowerApp: App {
                 .environment(updaterController)
                 .background(WindowAccessor(appDelegate: appDelegate))
                 .onAppear {
-                    // Configure AppDelegate with our viewModel
-                    viewModel.daemonManager = daemonManager
-                    appDelegate.configure(with: viewModel)
                     daemonManager.refreshStatus()
 
                     if !hasCompletedOnboarding {

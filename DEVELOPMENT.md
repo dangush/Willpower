@@ -180,3 +180,8 @@ The unsigned build and package tests cannot verify privileged service registrati
 or System Settings approval. Install a signed app and reinstall its background
 service once to load these daemon changes; building alone does not replace the
 running service.
+
+
+### Browser monitoring at startup
+
+Launch an installed build with `open -g -j /Applications/Willpower.app` and leave it hidden. Confirm the app logs “Starting state sync and browser monitoring from app lifecycle” followed by “Started monitoring” without opening its window. With an enabled trigger and browser automation permission, a matching browser visit should reach the daemon. Repeat after logging in with Launch at Login enabled. The app delegate owns the shared view model and daemon manager so monitoring starts independently of SwiftUI view appearance.

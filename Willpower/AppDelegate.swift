@@ -19,30 +19,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
-    private var viewModel: WillpowerViewModel?
+    let viewModel = WillpowerViewModel()
+    let daemonManager = DaemonManager()
     private var mainWindow: NSWindow?
     var openMainWindow: (() -> Void)?
     private var isWindowVisible = false
     private var iconUpdateTimer: Timer?
     private lazy var logoIcon: NSImage = createLogoIcon()
 
-    // MARK: - Configuration
-
-    func configure(with viewModel: WillpowerViewModel) {
-        self.viewModel = viewModel
-
-        // Ensure menu bar is set up (may not have happened in applicationDidFinishLaunching with @NSApplicationDelegateAdaptor)
-        if statusItem == nil {
-            setupMenuBarItem()
-            startIconUpdateTimer()
-            logger.info("Menu bar item created in configure()")
-        }
-
-        // Start state sync (idempotent - safe to call multiple times)
-        viewModel.startStateSync()
-
-        // Update icon immediately with current state
-        updateMenuBarIcon()
+    override init() {
+        super.init()
+        viewModel.daemonManager = daemonManager
     }
 
     // MARK: - App Lifecycle
@@ -50,9 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBarItem()
 
-        // Start state sync immediately (not dependent on window)
-        // This ensures browser monitoring runs even if window isn't shown
-        viewModel?.startStateSync()
+        logger.info("Starting state sync and browser monitoring from app lifecycle")
+        viewModel.startStateSync()
 
         // Check if launched at login vs user-initiated
         let launchedAtLogin = isLaunchedAtLogin()
@@ -83,7 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        viewModel?.stopStateSync()
+        viewModel.stopStateSync()
         iconUpdateTimer?.invalidate()
         iconUpdateTimer = nil
     }
@@ -184,7 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func updateMenuBarIcon() {
         guard let button = statusItem?.button else { return }
 
-        let isBlocking = !(viewModel?.activeBlocks.isEmpty ?? true)
+        let isBlocking = !viewModel.activeBlocks.isEmpty
 
         if isBlocking {
             // Active state: filled shield SF Symbol
@@ -276,7 +262,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateStatusMenuItem() {
-        guard let menu = statusMenu, let viewModel = viewModel else { return }
+        guard let menu = statusMenu else { return }
 
         // Find status menu item by tag
         if let statusItem = menu.item(withTag: 100) {
@@ -411,11 +397,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Called from SwiftUI menu or programmatically - quits the app with warning if needed
     func quitCompletely() {
         // Check for visit-based triggers that require background monitoring
-        if let viewModel = viewModel, viewModel.requiresBackgroundMonitoring {
+        if viewModel.requiresBackgroundMonitoring {
             showQuitWarningThenTerminate()
         } else {
             // No warning needed - just quit
-            viewModel?.stopStateSync()
+            viewModel.stopStateSync()
             NSApp.terminate(nil)
         }
     }
@@ -449,7 +435,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Force quit without further warnings (bypasses applicationShouldTerminate)
     private func forceQuit() {
-        viewModel?.stopStateSync()
+        viewModel.stopStateSync()
         iconUpdateTimer?.invalidate()
         iconUpdateTimer = nil
         // Use exit() to bypass applicationShouldTerminate which might show another warning
