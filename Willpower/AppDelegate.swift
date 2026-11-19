@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var openMainWindow: (() -> Void)?
     private var isWindowVisible = false
     private var iconUpdateTimer: Timer?
+    private var quitShortcutMonitor: Any?
     private lazy var logoIcon: NSImage = createLogoIcon()
 
     override init() {
@@ -36,6 +37,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBarItem()
+        quitShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+            guard modifiers == .command, event.charactersIgnoringModifiers?.lowercased() == "q" else {
+                return event
+            }
+            Task { @MainActor [weak self] in
+                logger.info("Command-Q: hiding window and continuing browser monitoring")
+                self?.hideMainWindow()
+            }
+            return nil
+        }
 
         logger.info("Starting state sync and browser monitoring from app lifecycle")
         viewModel.startStateSync()
@@ -59,16 +71,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startIconUpdateTimer()
     }
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        logger.info("Last window closed; continuing browser monitoring")
+        return false
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // Always allow termination - warnings are handled by quitCompletely()
         // This is called when:
         // 1. User uses "Quit Completely" (warning already shown if needed)
         // 2. System requests termination (logout, shutdown - should allow)
         // 3. External force quit (should allow)
+        logger.info("App termination requested")
         return .terminateNow
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        logger.info("App terminating; browser monitoring will stop")
+        if let quitShortcutMonitor { NSEvent.removeMonitor(quitShortcutMonitor) }
+        quitShortcutMonitor = nil
         viewModel.stopStateSync()
         iconUpdateTimer?.invalidate()
         iconUpdateTimer = nil
@@ -371,7 +392,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func hideMainWindow() {
         // Hide the window instead of closing it (so we can show it again)
         // orderOut removes from screen but keeps the window object
-        mainWindow?.orderOut(nil)
+        let window = mainWindow ?? findMainContentWindow()
+        window?.orderOut(nil)
 
         // Small delay before changing activation policy to avoid visual glitches
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -379,7 +401,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         isWindowVisible = false
-        logger.debug("Window hidden - running in background")
+        logger.info("Window hidden; continuing browser monitoring")
     }
 
     /// Called by WindowAccessor when window becomes visible

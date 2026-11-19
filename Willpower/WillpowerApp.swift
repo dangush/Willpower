@@ -77,7 +77,7 @@ struct WillpowerApp: App {
 
             // Replace default Quit command - Cmd+Q hides window, keeps app in menu bar
             CommandGroup(replacing: .appTermination) {
-                Button("Close Window") {
+                Button("Hide Window") {
                     appDelegate.hideMainWindow()
                 }
                 .keyboardShortcut("q", modifiers: .command)

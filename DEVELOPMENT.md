@@ -185,3 +185,8 @@ running service.
 ### Browser monitoring at startup
 
 Launch an installed build with `open -g -j /Applications/Willpower.app` and leave it hidden. Confirm the app logs “Starting state sync and browser monitoring from app lifecycle” followed by “Started monitoring” without opening its window. With an enabled trigger and browser automation permission, a matching browser visit should reach the daemon. Repeat after logging in with Launch at Login enabled. The app delegate owns the shared view model and daemon manager so monitoring starts independently of SwiftUI view appearance.
+
+
+### Closing the window without stopping triggers
+
+With an enabled visit trigger, record the app PID, press Command-Q while Willpower is frontmost, and verify that the window hides while the same PID remains alive. The app should log “Command-Q: hiding window and continuing browser monitoring”. Repeat using the red close button and Command-W. Visit a matching URL after navigating away for at least the 30-second deduplication interval and verify that the daemon receives the visit. Verify that Command-Option-Q still opens the explicit quit warning; cancel it to keep monitoring.
